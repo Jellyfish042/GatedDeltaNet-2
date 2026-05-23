@@ -515,6 +515,8 @@ if __name__ == "__main__":
         max_tokens = int(3e10) # 30 b
     elif "15B" in name:
         max_tokens = int(3e10) // 2 # 30 b
+    elif "10B" in name:
+        max_tokens = int(1e10) # 10 billion
     else:
         raise ValueError("Unknown training token config")
     

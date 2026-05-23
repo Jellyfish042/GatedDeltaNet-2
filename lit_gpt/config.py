@@ -31,6 +31,10 @@ class Config:
     local_window: int = -1
     mlp: bool = True
     gdn2_per_layer: int = -1
+    gdn2_num_heads: int = 16
+    gdn2_head_dim: int = 128
+    gdn2_num_v_heads: Optional[int] = None
+    gdn2_expand_v: float = 1.0
     nope: bool = False
     mamba_init: bool = False
     # to use multi-head attention (MHA), set this to `n_head` (default)
@@ -146,6 +150,28 @@ configs = [
         norm_eps=1e-5,
         _mlp_class="LLaMAMLP",
         intermediate_size=6784,
+        local_window=2048,
+        mamba_init=True,
+    ),
+    dict(
+        org="NVIDIA",
+        name="swa_gdn2_100M",
+        block_size=4096,
+        vocab_size=32000,
+        padding_multiple=64,
+        gdn2_per_layer=2,
+        gdn2_num_heads=4,
+        gdn2_head_dim=64,
+        n_layer=12,
+        n_head=12,
+        n_embd=768,
+        rotary_percentage=1.0,
+        parallel_residual=False,
+        bias=False,
+        _norm_class="FusedRMSNorm",
+        norm_eps=1e-5,
+        _mlp_class="LLaMAMLP",
+        intermediate_size=2048,
         local_window=2048,
         mamba_init=True,
     )
