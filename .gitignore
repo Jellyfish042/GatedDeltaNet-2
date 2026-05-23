@@ -2,3 +2,4 @@ AGENTS.md
 .codex/
 __pycache__/
 temp/
+experiments_states.md
