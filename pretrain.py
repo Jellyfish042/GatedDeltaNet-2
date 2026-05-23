@@ -81,9 +81,19 @@ def main(args):
             os.makedirs(target_litgpt_save_dir)
             os.makedirs(target_bash_scripts_save_dir)
             if not args.debug:
-                copy_tree(os.path.join(wd, 'modern_litgpt/lit_gpt'), target_litgpt_save_dir)
-                copy_tree(os.path.join(wd, "modern_litgpt/bash_scripts"), target_bash_scripts_save_dir)
-                shutil.copyfile(os.path.join(wd, "modern_litgpt/pretrain.py"), target_pretrain_file)                
+                repo_dir = Path(__file__).parent.resolve()
+                source_litgpt_dir = wd / "modern_litgpt" / "lit_gpt"
+                source_scripts_dir = wd / "modern_litgpt" / "bash_scripts"
+                source_pretrain_file = wd / "modern_litgpt" / "pretrain.py"
+                if not source_litgpt_dir.is_dir():
+                    source_litgpt_dir = repo_dir / "lit_gpt"
+                if not source_scripts_dir.is_dir():
+                    source_scripts_dir = repo_dir / "scripts"
+                if not source_pretrain_file.is_file():
+                    source_pretrain_file = repo_dir / "pretrain.py"
+                copy_tree(str(source_litgpt_dir), target_litgpt_save_dir)
+                copy_tree(str(source_scripts_dir), target_bash_scripts_save_dir)
+                shutil.copyfile(str(source_pretrain_file), target_pretrain_file)                
     
     config = Config.from_name(args.model_name)
     if args.use_stream_tok:
@@ -336,13 +346,13 @@ def validate(args, fabric: L.Fabric, model: torch.nn.Module, val_dataloader: Dat
     if fabric.global_rank == 0:
         fabric.print("Validating ...")
     model.eval()
-    #eval_iters = eval_iters if eval_iters is not None else args.eval_iters
+    eval_iters = eval_iters if eval_iters is not None else args.eval_iters
     losses = torch.zeros(args.num_extrapol, device=fabric.device, dtype=torch.float64)
     num_sample = 0
     for k, val_data in enumerate(val_dataloader):
+        if k >= eval_iters:
+            break
         num_sample += 1
-        # if k >= eval_iters:
-            # break        
         for i, length in enumerate([4096, 8192, 12288, 16384]):   #[2048, 4096, 8192, 16384]
             if args.use_stream_tok:
                 input_ids = val_data['input_ids'][:, 0:length].contiguous().to(fabric.device)
@@ -370,7 +380,19 @@ def create_dataloader(
         random.seed(seed)
         random.shuffle(filenames)
         if split != "train":
-            n_chunks = - (8 // -nodes) # ceil division
+            requested_chunks = - (8 // -nodes) # ceil division
+            usable_files = len(filenames) // fabric.world_size * fabric.world_size
+            files_per_rank = usable_files // fabric.world_size
+            if files_per_rank < 1:
+                raise RuntimeError(
+                    f"Not enough validation files for {fabric.world_size} ranks: found {len(filenames)} files in {data_dir}"
+                )
+            n_chunks = min(requested_chunks, files_per_rank)
+            if fabric.global_rank == 0 and n_chunks < requested_chunks:
+                fabric.print(
+                    f"Validation has only {files_per_rank} files per rank; reducing n_chunks "
+                    f"from {requested_chunks} to {n_chunks}."
+                )
         else:
             n_chunks = 8
         dataset = PackedDataset(

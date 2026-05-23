@@ -19,6 +19,7 @@ from lit_gpt.config import Config
 from .fused_rotary_embedding import apply_rotary_emb_func
 
 from .gdn2 import GatedDeltaNet2
+from .rwkv7 import RWKV7TimeMix
 
 RoPECache = Tuple[torch.Tensor, torch.Tensor]
 KVCache = Tuple[torch.Tensor, torch.Tensor]
@@ -46,6 +47,8 @@ class GPT(nn.Module):
 
     def _init_weights(self, module: nn.Module, n_layer) -> None:
         """Meant to be used with `gpt.apply(gpt._init_weights)`."""
+        if getattr(module, "_skip_reinit", False):
+            return
         # GPT-NeoX  https://arxiv.org/pdf/2204.06745.pdf
         if isinstance(module, nn.Embedding):
             if self.mamba_init:
@@ -129,10 +132,11 @@ class GPT(nn.Module):
 
         # forward the model itself
         x = self.transformer.wte(idx)  # token embeddings of shape (b, t, n_embd)
+        v_first = None
 
         if not use_kv_cache:
             for block in self.transformer.h:
-                x, *_ = block(x, rope, max_seq_length)
+                x, _, v_first = block(x, rope, max_seq_length, v_first=v_first)
         else:
             start_pos = int(input_pos[0].item())
             if start_pos == 0:
@@ -144,8 +148,8 @@ class GPT(nn.Module):
                 self.kv_caches = self.kv_caches or self.build_kv_caches(x, max_seq_length, cos.size(-1) * 2)
 
             for i, block in enumerate(self.transformer.h):
-                x, self.kv_caches[i] = block(
-                    x, rope, max_seq_length, mask, input_pos, self.kv_caches[i],
+                x, self.kv_caches[i], v_first = block(
+                    x, rope, max_seq_length, mask, input_pos, self.kv_caches[i], v_first=v_first,
                 )
 
         x = self.transformer.ln_f(x)
@@ -208,7 +212,16 @@ class Block(nn.Module):
         super().__init__()
         self.norm_1 = config.norm_class(config.n_embd, eps=config.norm_eps)
         self.use_gdn2 = layer_idx % config.gdn2_per_layer == 0 if config.gdn2_per_layer > 0 else False
-        if self.use_gdn2:
+        self.use_rwkv7_time = self.use_gdn2 and config.token_mixer == "rwkv7_time"
+        if self.use_rwkv7_time:
+            self.attn = RWKV7TimeMix(
+                n_embd=config.n_embd,
+                n_layer=config.n_layer,
+                layer_idx=layer_idx,
+                head_size=config.rwkv7_head_size,
+                head_size_divisor=config.rwkv7_head_size_divisor,
+            )
+        elif self.use_gdn2:
             self.attn = GatedDeltaNet2(
                 hidden_size=config.n_embd,
                 expand_v=config.gdn2_expand_v,
@@ -232,9 +245,13 @@ class Block(nn.Module):
         mask: Optional[torch.Tensor] = None,
         input_pos: Optional[torch.Tensor] = None,
         kv_cache: Optional[KVCache] = None,
-    ) -> Tuple[torch.Tensor, Optional[KVCache]]:
+        v_first: Optional[torch.Tensor] = None,
+    ) -> Tuple[torch.Tensor, Optional[KVCache], Optional[torch.Tensor]]:
         n_1 = self.norm_1(x)
-        if self.use_gdn2:
+        if self.use_rwkv7_time:
+            h, v_first = self.attn(n_1, v_first)
+            new_kv_cache = None
+        elif self.use_gdn2:
             h, _, new_kv_cache = self.attn(n_1, attention_mask=None)
         else:
             h, new_kv_cache = self.attn(n_1, rope, max_seq_length, mask, input_pos, kv_cache)
@@ -250,7 +267,7 @@ class Block(nn.Module):
                 n_2 = self.norm_2(x)
                 h = self.mlp(n_2)
                 x = x + h
-        return x, new_kv_cache
+        return x, new_kv_cache, v_first
 
 
 class CausalSelfAttention(nn.Module):
