@@ -5,9 +5,15 @@
 import math
 import torch
 import torch.nn as nn
-from torch.nn import functional as F
 
-from lit_gpt.rwkv7_ops.rwkv7_cuda_kernel import RUN_CUDA_RWKV7g
+from lit_gpt.rwkv7_ops.fused_time_mix_kernels import (
+    rwkv7_clampw_cuda,
+    tmix_a_gate_bf16,
+    tmix_kk_pre_bf16_v5,
+    tmix_lnx_rkvres_xg_bf16_v1,
+    tmix_mix6_bf16_v5,
+    tmix_vres_gate_bf16_v1,
+)
 
 ########################################################################################################
 
@@ -87,7 +93,6 @@ class RWKV_Tmix_x070(nn.Module):
             self.k_a = nn.Parameter(torch.zeros(1, 1, C) + 1.02)
             self.r_k = nn.Parameter(torch.zeros(H, N) - 0.04)
 
-            self.time_shift = nn.ZeroPad2d((0, 0, 1, -1))
             self.receptance = nn.Linear(C, C, bias=False)
             self.key = nn.Linear(C, C, bias=False)
             self.value = nn.Linear(C, C, bias=False)
@@ -103,41 +108,29 @@ class RWKV_Tmix_x070(nn.Module):
                 linear._skip_reinit = True
 
     def forward(self, x, v_first):
-        B, T, C = x.size()
-        H = self.n_head
-        xx = self.time_shift(x) - x
-
-        xr = x + xx * self.x_r
-        xw = x + xx * self.x_w
-        xk = x + xx * self.x_k
-        xv = x + xx * self.x_v
-        xa = x + xx * self.x_a
-        xg = x + xx * self.x_g
+        xr, xw, xk, xv, xa, xg = tmix_mix6_bf16_v5(
+            x,
+            self.x_r,
+            self.x_w,
+            self.x_k,
+            self.x_v,
+            self.x_a,
+            self.x_g,
+        )
 
         r = self.receptance(xr)
-        w = -F.softplus(-(self.w0 + torch.tanh(xw @ self.w1) @ self.w2)) - 0.5  # soft-clamp to (-inf, -0.5)
+        w = self.w0 + torch.tanh(xw @ self.w1) @ self.w2
         k = self.key(xk)
         v = self.value(xv)
         if self.layer_id == 0:
             v_first = v  # store the v of the first layer
         else:
-            v = v + (v_first - v) * torch.sigmoid(self.v0 + (xv @ self.v1) @ self.v2)  # add value residual
-        a = torch.sigmoid(self.a0 + (xa @ self.a1) @ self.a2)  # a is "in-context learning rate"
+            v = tmix_vres_gate_bf16_v1(v, v_first, self.v0, (xv @ self.v1) @ self.v2)
+        a = tmix_a_gate_bf16(self.a0, (xa @ self.a1) @ self.a2)
         g = torch.sigmoid(xg @ self.g1) @ self.g2
 
-        kk = k * self.k_k
-        kk = F.normalize(kk.view(B, T, H, -1), dim=-1, p=2.0).view(B, T, C)
-        k = k * (1 + (a - 1) * self.k_a)
-
-        r = r.to(torch.bfloat16)
-        w = w.to(torch.bfloat16)
-        k = k.to(torch.bfloat16)
-        v = v.to(torch.bfloat16)
-        kk = kk.to(torch.bfloat16)
-        a = a.to(torch.bfloat16)
-        x = RUN_CUDA_RWKV7g(r, w, k, v, -kk, kk * a)
-        x = self.ln_x(x.view(B * T, C)).view(B, T, C)
-
-        x = x + ((r.view(B, T, H, -1) * k.view(B, T, H, -1) * self.r_k).sum(dim=-1, keepdim=True) * v.view(B, T, H, -1)).view(B, T, C)
-        x = self.output(x * g)
+        k, neg_kk, kka = tmix_kk_pre_bf16_v5(k, self.k_k, a, self.k_a)
+        x = rwkv7_clampw_cuda(r, w, k, v, neg_kk, kka)
+        x = tmix_lnx_rkvres_xg_bf16_v1(x, r, k, v, self.r_k, self.ln_x.weight, self.ln_x.bias, g)
+        x = self.output(x)
         return x, v_first

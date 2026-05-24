@@ -70,4 +70,4 @@ if [[ "$DEBUG" == "1" ]]; then
   args+=(--debug)
 fi
 
-exec "$CONDA" run -n "$CONDA_ENV" "${args[@]}"
+exec "$CONDA" run --no-capture-output -n "$CONDA_ENV" "${args[@]}"
