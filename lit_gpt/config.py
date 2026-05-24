@@ -118,7 +118,7 @@ configs = [
     # ---------------- GatedDeltaNet2 (gdn2) ----------------
     dict(
         org="NVIDIA",
-        name="gdn2_1.3B", # Total parameters 1,302,638,112
+        name="gdn2_1.3B",  # Total parameters 1,302,638,112
         block_size=4096,
         vocab_size=32000,
         padding_multiple=64,
@@ -138,7 +138,7 @@ configs = [
     ),
     dict(
         org="NVIDIA",
-        name="swa_gdn2_1.3B", # Total parameters 1,300,314,384
+        name="swa_gdn2_1.3B",  # Total parameters 1,300,314,384
         block_size=4096,
         vocab_size=32000,
         padding_multiple=64,
@@ -180,12 +180,12 @@ configs = [
     ),
     dict(
         org="NVIDIA",
-        name="gdn2_100M",
+        name="gdn2_12h_100M",
         block_size=4096,
         vocab_size=32000,
         padding_multiple=64,
         gdn2_per_layer=1,
-        gdn2_num_heads=4,
+        gdn2_num_heads=12,
         gdn2_head_dim=64,
         n_layer=12,
         n_head=12,
@@ -221,7 +221,7 @@ configs = [
         intermediate_size=2048,
         local_window=2048,
         mamba_init=True,
-    )
+    ),
 ]
 
 name_to_config = {config["name"]: config for config in configs}
