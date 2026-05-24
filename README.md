@@ -1,18 +1,16 @@
-# 🔺 Gated DeltaNet-2: Decoupling Erase and Write in Linear Attention
+GDN-2 is cool. I trained a 150M model on 10B tokens and it works fine. But I found a simple trick to make it better
 
-## One Simple Trick
+1. `curl -fsSL https://raw.githubusercontent.com/Jellyfish042/backbone2rwkv_skill/main/install.sh | sh`
 
-Gated DeltaNet-2 is cool. I trained a 150M GDN-2 model for 10B tokens, and then found a simple trick that made it work better:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/Jellyfish042/backbone2rwkv_skill/main/install.sh | sh
-```
-
-Then ask your Codex to convert the backbone to RWKV-7.
+2. Ask Codex to convert it to RWKV-7.
 
 <p align="center">
   <img src="assets/gdn2_vs_rwkv7.png" width="100%" />
 </p>
+
+
+# 🔺 Gated DeltaNet-2: Decoupling Erase and Write in Linear Attention
+
 
 Official PyTorch implementation of **Gated DeltaNet-2: Decoupling Erase and Write in Linear Attention**.
 
