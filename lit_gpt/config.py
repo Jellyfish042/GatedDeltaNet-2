@@ -244,6 +244,28 @@ configs = [
         local_window=2048,
         mamba_init=True,
     ),
+    dict(
+        org="NVIDIA",
+        name="rwkv7_time_1024x12",
+        block_size=4096,
+        vocab_size=32000,
+        padding_multiple=64,
+        token_mixer="rwkv7_time",
+        gdn2_per_layer=1,
+        nope=True,
+        n_layer=12,
+        n_head=16,
+        n_embd=1024,
+        rotary_percentage=1.0,
+        parallel_residual=False,
+        bias=False,
+        _norm_class="FusedRMSNorm",
+        norm_eps=1e-5,
+        _mlp_class="LLaMAMLP",
+        intermediate_size=4352,
+        local_window=2048,
+        mamba_init=True,
+    ),
 ]
 
 name_to_config = {config["name"]: config for config in configs}
