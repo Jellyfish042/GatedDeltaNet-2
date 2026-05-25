@@ -1,9 +1,28 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT="${ROOT:-/data/tankaifeng/gdn2_train}"
-REPO="${REPO:-$ROOT/repo/GatedDeltaNet-2}"
-CONDA="${CONDA:-/home/tankaifeng/ENTER/bin/conda}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO="${REPO:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+if [[ -z "${ROOT:-}" ]]; then
+  if [[ "$(basename "$(dirname "$REPO")")" == "repo" ]]; then
+    ROOT="$(cd "$REPO/../.." && pwd)"
+  else
+    ROOT="$REPO"
+  fi
+fi
+if [[ -z "${CONDA:-}" ]]; then
+  if command -v conda >/dev/null 2>&1; then
+    CONDA="$(command -v conda)"
+  elif [[ -x "$HOME/ENTER/bin/conda" ]]; then
+    CONDA="$HOME/ENTER/bin/conda"
+  elif [[ -x "$HOME/miniconda3/bin/conda" ]]; then
+    CONDA="$HOME/miniconda3/bin/conda"
+  elif [[ -x "$HOME/anaconda3/bin/conda" ]]; then
+    CONDA="$HOME/anaconda3/bin/conda"
+  else
+    CONDA="conda"
+  fi
+fi
 CONDA_ENV="${CONDA_ENV:-unc}"
 DATA_ROOT="${DATA_ROOT:-$ROOT/data/fineweb_edu_packed_100B}"
 SAVE_DIR="${SAVE_DIR:-$ROOT/runs}"
