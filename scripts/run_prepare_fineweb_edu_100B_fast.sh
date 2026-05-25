@@ -16,6 +16,8 @@ TRAIN_TOKENS="${TRAIN_TOKENS:-100B}"
 VAL_TOKENS="${VAL_TOKENS:-50M}"
 BATCH_SIZE="${BATCH_SIZE:-512}"
 MAX_WORKERS="${MAX_WORKERS:-8}"
+PACK_WORKERS="${PACK_WORKERS:-16}"
+PACK_BATCH_SIZE="${PACK_BATCH_SIZE:-1024}"
 USE_XET="${USE_XET:-0}"
 HF_XET_NUM_CONCURRENT_RANGE_GETS="${HF_XET_NUM_CONCURRENT_RANGE_GETS:-16}"
 HF_HUB_DOWNLOAD_TIMEOUT="${HF_HUB_DOWNLOAD_TIMEOUT:-60}"
@@ -119,6 +121,8 @@ run_job() {
   echo "Proxy: $PROXY"
   echo "HF endpoint: $HF_ENDPOINT"
   echo "MAX_WORKERS=$MAX_WORKERS"
+  echo "PACK_WORKERS=$PACK_WORKERS"
+  echo "PACK_BATCH_SIZE=$PACK_BATCH_SIZE"
   echo "USE_XET=$USE_XET"
   echo "HF_XET_HIGH_PERFORMANCE=${HF_XET_HIGH_PERFORMANCE:-0}"
   echo "HF_XET_NUM_CONCURRENT_RANGE_GETS=$HF_XET_NUM_CONCURRENT_RANGE_GETS"
@@ -131,13 +135,12 @@ run_job() {
   fi
 
   if [[ "$DOWNLOAD_ONLY" != "1" ]]; then
-    "$CONDA" run --no-capture-output -n "$CONDA_ENV" python "$REPO/scripts/pack_fineweb_edu_100B_from_parquet.py" \
+    "$CONDA" run --no-capture-output -n "$CONDA_ENV" python "$REPO/scripts/pack_fineweb_edu_100B_from_parquet_parallel.py" \
       --parquet-dir "$PARQUET_DIR" \
       --out-root "$OUT" \
       --tokenizer "$TOKENIZER" \
-      --train-tokens "$TRAIN_TOKENS" \
-      --val-tokens "$VAL_TOKENS" \
-      --batch-size "$BATCH_SIZE" \
+      --workers "$PACK_WORKERS" \
+      --batch-size "$PACK_BATCH_SIZE" \
       --resume
   fi
 }
@@ -161,6 +164,8 @@ else
     VAL_TOKENS="$VAL_TOKENS" \
     BATCH_SIZE="$BATCH_SIZE" \
     MAX_WORKERS="$MAX_WORKERS" \
+    PACK_WORKERS="$PACK_WORKERS" \
+    PACK_BATCH_SIZE="$PACK_BATCH_SIZE" \
     USE_XET="$USE_XET" \
     HF_XET_NUM_CONCURRENT_RANGE_GETS="$HF_XET_NUM_CONCURRENT_RANGE_GETS" \
     HF_HUB_DOWNLOAD_TIMEOUT="$HF_HUB_DOWNLOAD_TIMEOUT" \
