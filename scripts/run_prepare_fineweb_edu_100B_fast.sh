@@ -64,7 +64,7 @@ if [[ "$DOWNLOAD_ONLY" == "1" && "$PACK_ONLY" == "1" ]]; then
 fi
 
 running_jobs="$(
-  pgrep -af "download_fineweb_edu_100B_parquet.py|pack_fineweb_edu_100B_from_parquet.py|run_prepare_fineweb_edu_100B_fast" \
+  pgrep -af "download_fineweb_edu_100B_parquet.py|pack_fineweb_edu_100B_from_parquet.py" \
     | awk -v self="$$" '$1 != self { print }' || true
 )"
 if [[ "${SKIP_RUNNING_CHECK:-0}" != "1" && -n "$running_jobs" ]]; then
