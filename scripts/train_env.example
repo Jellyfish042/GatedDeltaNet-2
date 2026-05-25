@@ -1,0 +1,12 @@
+# Source this file or copy the assignments into your shell before running a
+# training script when your repo/data/conda paths differ from the defaults.
+
+export ROOT="/path/to/gdn2_train"
+export REPO="/path/to/GatedDeltaNet-2"
+export CONDA="/path/to/conda"
+export CONDA_ENV="unc"
+
+# Optional common overrides:
+# export DATA_ROOT="$ROOT/data/fineweb_edu_packed_100B"
+# export CUDA_VISIBLE_DEVICES="0,1"
+# export NPROC_PER_NODE="2"
