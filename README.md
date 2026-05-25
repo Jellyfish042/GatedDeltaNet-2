@@ -1,6 +1,6 @@
 GDN-2 is cool. I trained a 150M model on 10B tokens and it works fine. But I found a simple trick to make it better
 
-1. `curl -fsSL https://raw.githubusercontent.com/Jellyfish042/backbone2rwkv_skill/main/install.sh | sh`
+1. `curl -fsSL https://raw.githubusercontent.com/Jellyfish042/backbone2rwkv_skill/main/install.sh | BACKBONE2RWKV_SKILL=backbone2rwkv BACKBONE2RWKV_LANG=en sh`
 
 2. Ask Codex to convert it to RWKV-7.
 
