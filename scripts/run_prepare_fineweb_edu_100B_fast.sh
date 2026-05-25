@@ -63,9 +63,13 @@ if [[ "$DOWNLOAD_ONLY" == "1" && "$PACK_ONLY" == "1" ]]; then
   exit 2
 fi
 
-if [[ "${SKIP_RUNNING_CHECK:-0}" != "1" ]] && pgrep -af "download_fineweb_edu_100B_parquet.py|pack_fineweb_edu_100B_from_parquet.py|run_prepare_fineweb_edu_100B_fast" >/dev/null; then
+running_jobs="$(
+  pgrep -af "download_fineweb_edu_100B_parquet.py|pack_fineweb_edu_100B_from_parquet.py|run_prepare_fineweb_edu_100B_fast" \
+    | awk -v self="$$" '$1 != self { print }' || true
+)"
+if [[ "${SKIP_RUNNING_CHECK:-0}" != "1" && -n "$running_jobs" ]]; then
   echo "A fast 100B prepare job may already be running:" >&2
-  pgrep -af "download_fineweb_edu_100B_parquet.py|pack_fineweb_edu_100B_from_parquet.py|run_prepare_fineweb_edu_100B_fast" >&2
+  echo "$running_jobs" >&2
   exit 1
 fi
 
